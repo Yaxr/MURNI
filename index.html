@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MURNI</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        input { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-secondary { background-color: #28a745; color: white; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .wa-link { display: block; margin-top: 15px; color: #25D366; text-decoration: none; font-weight: bold; font-size: 14px;}
+        #dashboard-section { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="auth-section">
+        <h2>Login / Register</h2>
+        <input type="email" id="email" placeholder="Masukkan Email" required>
+        <input type="password" id="password" placeholder="Masukkan Password" required>
+        
+        <button id="login-btn" class="btn-primary">Login</button>
+        <button id="register-btn" class="btn-secondary">Register</button>
+        
+        <a href="https://wa.me/6282187439224?text=Halo%20Admin,%20saya%20lupa%20password%20akun%20website%20saya.%20Mohon%20bantuannya." target="_blank" class="wa-link">
+            Lupa Password? Hubungi Admin (WA)
+        </a>
+        <p id="auth-message" style="color: red; font-size: 14px; margin-top: 10px;"></p>
+    </div>
+
+    <div id="dashboard-section">
+        <h2>Dashboard</h2>
+        <p>Login sebagai: <strong id="user-email"></strong></p>
+        
+        <input type="file" id="file-input">
+        <button id="upload-btn" class="btn-primary">Upload File</button>
+        <p id="upload-status" style="color: #007bff; font-size: 14px; margin-top: 10px;"></p>
+
+        <button id="logout-btn" class="btn-danger" style="margin-top: 20px;">Logout</button>
+    </div>
+</div>
+
+<script>
+    // TODO: MASUKKAN WEB APP URL DARI GOOGLE APPS SCRIPT DI SINI
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxS6gvfr2o_vN_Nw6EjA4LsOPXbKe78TGv7byWinMvNd6g1njjJhvRXrPqk6GYSqQjEdg/exec";
+
+    // State Manajemen Sederhana
+    let currentUser = null;
+
+    // Elemen DOM
+    const authSection = document.getElementById('auth-section');
+    const dashboardSection = document.getElementById('dashboard-section');
+    const authMessage = document.getElementById('auth-message');
+    const uploadStatus = document.getElementById('upload-status');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+
+    // Fungsi Fetch ke Apps Script
+    async function sendDataToGAS(payload) {
+        try {
+            let response = await fetch(GAS_URL, {
+                method: 'POST',
+                // Kirim sebagai text/plain untuk menghindari isu CORS preflight di browser
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
+                body: JSON.stringify(payload)
+            });
+            return await response.json();
+        } catch (error) {
+            return { status: 'error', message: 'Gagal terhubung ke server.' };
+        }
+    }
+
+    // Navigasi UI
+    function updateUI() {
+        if (currentUser) {
+            authSection.style.display = 'none';
+            dashboardSection.style.display = 'block';
+            document.getElementById('user-email').innerText = currentUser;
+        } else {
+            authSection.style.display = 'block';
+            dashboardSection.style.display = 'none';
+        }
+    }
+
+    // --- FITUR REGISTER ---
+    document.getElementById('register-btn').addEventListener('click', async () => {
+        if(!emailInput.value || !passwordInput.value) return authMessage.innerText = "Isi email & password!";
+        authMessage.style.color = "blue";
+        authMessage.innerText = "Memproses registrasi...";
+        
+        let result = await sendDataToGAS({ action: 'register', email: emailInput.value, password: passwordInput.value });
+        
+        if (result.status === 'success') {
+            alert("Registrasi berhasil! Silakan login.");
+            authMessage.innerText = "";
+        } else {
+            authMessage.style.color = "red";
+            authMessage.innerText = result.message;
+        }
+    });
+
+    // --- FITUR LOGIN ---
+    document.getElementById('login-btn').addEventListener('click', async () => {
+        if(!emailInput.value || !passwordInput.value) return authMessage.innerText = "Isi email & password!";
+        authMessage.style.color = "blue";
+        authMessage.innerText = "Memeriksa data...";
+
+        let result = await sendDataToGAS({ action: 'login', email: emailInput.value, password: passwordInput.value });
+        
+        if (result.status === 'success') {
+            currentUser = emailInput.value;
+            emailInput.value = ''; passwordInput.value = ''; authMessage.innerText = '';
+            updateUI();
+        } else {
+            authMessage.style.color = "red";
+            authMessage.innerText = result.message;
+        }
+    });
+
+    // --- FITUR LOGOUT ---
+    document.getElementById('logout-btn').addEventListener('click', () => {
+        currentUser = null;
+        uploadStatus.innerText = '';
+        document.getElementById('file-input').value = '';
+        updateUI();
+    });
+
+    // --- FITUR UPLOAD FILE ---
+    document.getElementById('upload-btn').addEventListener('click', () => {
+        const file = document.getElementById('file-input').files[0];
+        if (!file) return uploadStatus.innerText = "Pilih file terlebih dahulu!", uploadStatus.style.color = "red";
+
+        uploadStatus.innerText = "Mengubah file untuk diupload...";
+        uploadStatus.style.color = "blue";
+        const btn = document.getElementById('upload-btn');
+        btn.disabled = true;
+
+        // Membaca file dan mengubahnya menjadi Base64 string
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            const base64Data = e.target.result.split(',')[1]; 
+            
+            uploadStatus.innerText = "Mengirim file ke Google Drive...";
+            
+            let result = await sendDataToGAS({
+                action: 'upload',
+                email: currentUser,
+                filename: file.name,
+                mimeType: file.type,
+                base64: base64Data
+            });
+
+            if (result.status === 'success') {
+                uploadStatus.innerText = "Upload berhasil!";
+                uploadStatus.style.color = "green";
+                document.getElementById('file-input').value = ''; // Reset input
+            } else {
+                uploadStatus.innerText = "Gagal upload: " + result.message;
+                uploadStatus.style.color = "red";
+            }
+            btn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    });
+</script>
+
+</body>
+</html>
